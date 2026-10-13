@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Deadline Rescue Agent — Student Recovery & Planning System</title>
+  <meta name="description" content="AI-powered task recovery and adaptive planning system for students facing tight academic deadlines. Built with LangGraph, Google Gemini, and FastAPI.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <!-- App Container -->
+  <div class="app-layout">
+    
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-container">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="brand-title">Smart Deadline Rescue Agent</h1>
+            <p class="brand-subtitle">Adaptive AI Academic Recovery Engine & Schedule Balancer</p>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <div id="ai-status-pill" class="status-pill {% if gemini_available %}status-ai{% else %}status-fallback{% endif %}">
+            <span class="status-dot"></span>
+            <span id="ai-status-text">
+              {% if gemini_available %}
+                Gemini {{ gemini_model }} Active
+              {% else %}
+                Deterministic Fallback Active
+              {% endif %}
+            </span>
+          </div>
+
+          <button id="view-workflow-btn" class="btn btn-secondary btn-sm" title="View LangGraph Workflow Nodes & Edges">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="12" r="3"/>
+              <path d="M8.59 7.41l6.83 3.18M8.59 16.59l6.83-3.18"/>
+            </svg>
+            LangGraph Workflow
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      
+      <!-- Summary Metric Cards -->
+      <section class="metrics-grid" id="metrics-section">
+        <div class="metric-card">
+          <div class="metric-icon bg-violet">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <span class="metric-label">Total Tasks</span>
+            <span class="metric-value" id="stat-total-tasks">0</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon bg-emerald">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <span class="metric-label">Completed</span>
+            <span class="metric-value" id="stat-completed-tasks">0</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon bg-rose">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <span class="metric-label">Urgent / Critical</span>
+            <span class="metric-value" id="stat-critical-tasks">0</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon bg-amber">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <span class="metric-label">Remaining Work</span>
+            <span class="metric-value" id="stat-remaining-hours">0.0h</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon bg-blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <span class="metric-label">Schedule Feasibility</span>
+            <span class="metric-value metric-status" id="stat-feasibility">READY</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Two-Column Workspace -->
+      <div class="dashboard-columns">
+        
+        <!-- Left Column: Input Forms -->
+        <div class="column-input">
+          
+          <!-- Study Preferences Card -->
+          <div class="card card-preferences">
+            <div class="card-header">
+              <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                Study Capacity & Preferences
+              </h2>
+            </div>
+            <div class="card-body">
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label for="pref-daily-hours">Study Hours / Day <span class="required">*</span></label>
+                  <input type="number" id="pref-daily-hours" value="4.0" step="0.5" min="0.5" max="24" required>
+                </div>
+                <div class="form-group flex-1">
+                  <label for="pref-start-date">Plan Start Date <span class="required">*</span></label>
+                  <input type="date" id="pref-start-date" required>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label for="pref-study-time">Study Start Time</label>
+                  <input type="time" id="pref-study-time" value="17:00">
+                </div>
+                <div class="form-group flex-1">
+                  <label for="pref-busy-dates">Busy Dates (Comma-separated)</label>
+                  <input type="text" id="pref-busy-dates" placeholder="YYYY-MM-DD, ...">
+                </div>
+              </div>
+
+              <div class="form-check">
+                <input type="checkbox" id="pref-include-weekends" checked>
+                <label for="pref-include-weekends">Include weekends for study sessions</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Task Entry Card -->
+          <div class="card card-entry">
+            <div class="card-header flex-between">
+              <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span id="form-action-title">Add Academic Task</span>
+              </h2>
+              <div class="card-header-actions">
+                <button type="button" id="load-sample-btn" class="btn btn-outline btn-xs" title="Load realistic sample academic workload for testing">
+                  Load Example Tasks
+                </button>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <form id="task-form">
+                <input type="hidden" id="task-id">
+
+                <div class="form-group">
+                  <label for="task-name">Task / Assignment Name <span class="required">*</span></label>
+                  <input type="text" id="task-name" placeholder="e.g. Operating Systems Lab Record" required>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="task-category">Subject / Category</label>
+                    <input type="text" id="task-category" placeholder="e.g. Computer Science" value="Computer Science">
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="task-deadline">Deadline Date <span class="required">*</span></label>
+                    <input type="date" id="task-deadline" required>
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="task-hours">Estimated Hours <span class="required">*</span></label>
+                    <input type="number" id="task-hours" placeholder="e.g. 4.0" step="0.5" min="0.5" max="100" required>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="task-completion">Completed (%)</label>
+                    <input type="number" id="task-completion" value="0" min="0" max="100" step="5">
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="task-difficulty">Difficulty</label>
+                    <select id="task-difficulty">
+                      <option value="Easy">Easy</option>
+                      <option value="Medium" selected>Medium</option>
+                      <option value="Hard">Hard</option>
+                    </select>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="task-importance">Importance</label>
+                    <select id="task-importance">
+                      <option value="Low">Low</option>
+                      <option value="Medium" selected>Medium</option>
+                      <option value="High">High</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="task-notes">Optional Notes</label>
+                  <input type="text" id="task-notes" placeholder="e.g. Includes viva preparation & simulation plots">
+                </div>
+
+                <div class="form-actions">
+                  <button type="submit" id="add-task-btn" class="btn btn-primary flex-1">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    <span id="submit-btn-text">Add to Task List</span>
+                  </button>
+                  <button type="button" id="cancel-edit-btn" class="btn btn-secondary btn-sm hidden">
+                    Cancel Edit
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Pending Tasks List Card -->
+          <div class="card card-tasklist">
+            <div class="card-header flex-between">
+              <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+                Current Tasks (<span id="task-count">0</span>)
+              </h2>
+              <button id="clear-all-btn" class="btn btn-text btn-xs text-danger" title="Remove all tasks">
+                Clear All
+              </button>
+            </div>
+            
+            <div class="card-body">
+              <div id="task-list-container" class="task-items-wrapper">
+                <div class="empty-state" id="tasks-empty-state">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  <p>No tasks added yet.</p>
+                  <span>Use the form above or click <b>Load Example Tasks</b> to test the agent.</span>
+                </div>
+              </div>
+
+              <!-- Main Plan Generation Trigger -->
+              <div class="plan-trigger-box">
+                <button id="generate-plan-btn" class="btn btn-rescue btn-block" disabled>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                  </svg>
+                  Run Smart Rescue Agent & Generate Plan
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Agent Output & Rescue Plan -->
+        <div class="column-output">
+
+          <!-- Plan Control Bar -->
+          <div class="plan-action-bar hidden" id="plan-action-bar">
+            <div class="plan-session-meta">
+              <span class="session-badge">Session: <b id="current-session-id">-</b></span>
+              <span class="change-badge" id="last-change-desc">Initial Plan</span>
+            </div>
+            <div class="plan-download-btn-wrapper">
+              <button id="download-pdf-btn" class="btn btn-secondary btn-sm" title="Download official ReportLab PDF">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download PDF Report
+              </button>
+            </div>
+          </div>
+
+          <!-- Loading Indicator -->
+          <div id="agent-loading" class="agent-loading-card hidden">
+            <div class="spinner"></div>
+            <div class="loading-content">
+              <h3>Agent Executing Workflow...</h3>
+              <p id="loading-node-indicator">Running LangGraph nodes & evaluating deadline feasibility...</p>
+            </div>
+          </div>
+
+          <!-- Conflicts & Feasibility Alerts Card -->
+          <div class="card alert-card hidden" id="conflicts-card">
+            <div class="card-header">
+              <h2 class="card-title text-danger">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                Deadline Feasibility & Overload Alerts
+              </h2>
+            </div>
+            <div class="card-body">
+              <ul id="conflicts-list" class="conflicts-list"></ul>
+            </div>
+          </div>
+
+          <!-- Agent Reasoning & Insights Card -->
+          <div class="card card-insights hidden" id="insights-card">
+            <div class="card-header flex-between">
+              <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                Agent Decision Insights
+              </h2>
+              <span id="insights-source-pill" class="badge badge-source">Source</span>
+            </div>
+            <div class="card-body">
+              <div class="insight-block">
+                <h4 class="insight-heading">Executive Summary</h4>
+                <p id="insight-exec-summary" class="insight-text"></p>
+              </div>
+
+              <div class="insight-block">
+                <h4 class="insight-heading">Priority Strategy & Risk Assessment</h4>
+                <p id="insight-priority-text" class="insight-text"></p>
+              </div>
+
+              <div class="insight-block" id="alternatives-block">
+                <h4 class="insight-heading text-amber">Trade-Offs & Emergency Alternatives</h4>
+                <p id="insight-alternatives" class="insight-text"></p>
+              </div>
+
+              <div class="insight-block">
+                <h4 class="insight-heading">Actionable Student Recommendations</h4>
+                <ul id="recommendations-list" class="recs-list"></ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Priority Ranking Card -->
+          <div class="card hidden" id="priority-card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                Task Priority Decision Ranking
+              </h2>
+            </div>
+            <div class="card-body">
+              <div id="priority-list" class="priority-items-wrapper"></div>
+            </div>
+          </div>
+
+          <!-- Daily Recovery Schedule Card -->
+          <div class="card hidden" id="schedule-card">
+            <div class="card-header flex-between">
+              <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                Date-Wise Recovery Schedule
+              </h2>
+              <span class="badge badge-info" id="schedule-summary-badge">0 Days</span>
+            </div>
+            <div class="card-body">
+              <div id="daily-schedule-timeline" class="schedule-timeline"></div>
+            </div>
+          </div>
+
+          <!-- Initial Empty State -->
+          <div class="card output-empty-card" id="output-placeholder">
+            <div class="empty-graphic">
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+              </svg>
+            </div>
+            <h3>Ready to Rescue Your Deadlines</h3>
+            <p>Add your assignments or tasks on the left, set your daily available study hours, and run the agent.</p>
+            <p class="text-muted">The system will analyze risk factors, calculate normalized priority scores, and build an honest, date-by-date recovery schedule.</p>
+          </div>
+
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Smart Deadline Rescue Agent &bull; Powered by LangGraph State Workflow &bull; Google Gemini & Deterministic Resilience</p>
+      <p class="text-muted text-xs">Note: Session states are stored in-memory for active sessions and will reset on application restart.</p>
+    </footer>
+
+  </div>
+
+  <!-- Workflow Topology Modal -->
+  <div id="workflow-modal" class="modal-backdrop hidden">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3 class="modal-title">LangGraph Agent Architecture & State Flow</h3>
+        <button id="close-modal-btn" class="btn-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="workflow-diagram">
+          <div class="wf-node wf-start">START</div>
+          <div class="wf-arrow">&darr;</div>
+          <div class="wf-node">1. Task Input Validator</div>
+          <div class="wf-arrow">&darr;</div>
+          <div class="wf-node">2. Deadline Risk Analyzer</div>
+          <div class="wf-arrow">&darr;</div>
+          <div class="wf-node">3. Workload Estimator</div>
+          <div class="wf-arrow">&darr;</div>
+          <div class="wf-node">4. Priority Decision Engine</div>
+          <div class="wf-arrow">&darr;</div>
+          <div class="wf-node">5. Recovery Plan Generator</div>
+          <div class="wf-arrow">&darr;</div>
+          <div class="wf-node wf-decision">6. Schedule Feasibility Checker</div>
+          
+          <div class="wf-conditional-grid">
+            <div class="wf-branch">
+              <span class="branch-label text-danger">&darr; Overload / Conflicts (<3 cycles)</span>
+              <div class="wf-node wf-loop">7. Plan Optimizer (Bounded Retry &le; 3)</div>
+              <span class="branch-return">&uarr; re-generates schedule</span>
+            </div>
+            <div class="wf-branch">
+              <span class="branch-label text-emerald">&darr; Feasible or Max Cycles Reached</span>
+              <div class="wf-node">8. Final Plan Evaluator</div>
+            </div>
+          </div>
+
+          <div class="wf-arrow">&darr;</div>
+          <div class="wf-node">9. Report Generator (Gemini / Fallback)</div>
+          <div class="wf-arrow">&darr;</div>
+          <div class="wf-node wf-end">END</div>
+        </div>
+
+        <div class="wf-info-panel">
+          <h4>Workflow Verification Details</h4>
+          <ul>
+            <li><b>Real LangGraph Workflow:</b> Compiled StateGraph with 9 discrete nodes, conditional edges, and shared typed state.</li>
+            <li><b>Bounded Retry Loop:</b> Automatically halts after 3 optimization attempts to avoid infinite recursion.</li>
+            <li><b>Honest Infeasibility:</b> If workload cannot fit before deadlines, accurately classifies plan as <code>INFEASIBLE_OVERLOADED</code> rather than claiming false feasibility.</li>
+            <li><b>Dual Reasoning:</b> Google Gemini API generates natural-language insights; deterministic engine seamlessly steps in if key is unset.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>
